@@ -260,7 +260,7 @@ if __name__ == "__main__":
         os.mkdir(dest_dir)
 
     file_copy_count = 0
-    folders_to_scan = [f"fold_{i}" for i in range(5)]
+    folders_to_scan = [f"fold_{i}/validation" for i in range(5)]
 
     for fold_name in folders_to_scan:
         source_dir = os.path.join(results_main_dir,fold_name)
