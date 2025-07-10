@@ -266,7 +266,7 @@ if __name__ == "__main__":
         source_dir = os.path.join(results_main_dir,fold_name)
 
         # Check if the source directory exists before trying to scan it
-        if not os.path.is_dir(source_dir):
+        if not os.path.isdir(source_dir):
             print(f"Skipping: Directory '{source_dir.name}' not found.")
             continue # Move to the next folder
 
