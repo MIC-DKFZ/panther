@@ -273,7 +273,7 @@ if __name__ == "__main__":
         print(f"--- Searching in '{source_dir}' ---")
 
         # 3. Find all files ending in .nii.gz using Path.glob()
-        nii_files = list(source_dir.glob("*.nii.gz"))
+        nii_files = list(Path(source_dir).glob("*.nii.gz"))
 
         if not nii_files:
             print("  No .nii.gz files found.")
