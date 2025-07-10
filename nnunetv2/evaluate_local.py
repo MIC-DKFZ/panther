@@ -256,7 +256,8 @@ if __name__ == "__main__":
     results_main_dir = "/dkfz/cluster/gpu/checkpoints/OE0441/o644l/nnUNet_results/Dataset902_PANTHER_HR/nnUNetTrainer__nnUNetResEncUNetLPlansMultiTalent__3d_fullres"
 
     dest_dir = os.path.join(results_main_dir, "fold_all")
-    os.mkdir(dest_dir)
+    if not os.path.exists(dest_dir):
+        os.mkdir(dest_dir)
 
     file_copy_count = 0
     folders_to_scan = [f"fold_{i}" for i in range(5)]
@@ -265,7 +266,7 @@ if __name__ == "__main__":
         source_dir = os.path.join(results_main_dir,fold_name)
 
         # Check if the source directory exists before trying to scan it
-        if not is_dir(source_dir):
+        if not os.path.is_dir(source_dir):
             print(f"Skipping: Directory '{source_dir.name}' not found.")
             continue # Move to the next folder
 
