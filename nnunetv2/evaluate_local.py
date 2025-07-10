@@ -267,10 +267,10 @@ if __name__ == "__main__":
 
         # Check if the source directory exists before trying to scan it
         if not os.path.isdir(source_dir):
-            print(f"Skipping: Directory '{source_dir.name}' not found.")
+            print(f"Skipping: Directory '{source_dir}' not found.")
             continue # Move to the next folder
 
-        print(f"--- Searching in '{source_dir.name}' ---")
+        print(f"--- Searching in '{source_dir}' ---")
 
         # 3. Find all files ending in .nii.gz using Path.glob()
         nii_files = list(source_dir.glob("*.nii.gz"))
