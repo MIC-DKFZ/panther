@@ -145,15 +145,15 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         if not (np.array_equal(unique_vals, [0]) or
                 np.array_equal(unique_vals, [0, 1]) or
                 np.array_equal(unique_vals, [1])):
-            if len(unique_vals) >= 2 and 0 in unique_vals:
+            if len(unique_vals) > 2 and 0 in unique_vals:
                 if verbose:
                     print(f"Subject {subj}: Remapping multi-class masks to binary for tumor (label 1).")
                     print(f"  Original GT unique values: {np.unique(mask_gt)}")
                     print(f"  Original Pred unique values: {np.unique(mask_pred)}")
                 if verbose:
                     print(f"Prediction mask for subject {subj} has unique values {unique_vals}. Converting nonzero values to 1.")
-                mask_pred = (mask_pred != 1).astype(np.uint8)
-                #mask_gt = (mask_pred != 1).astype(np.uint8)
+                mask_pred = (mask_pred == 1).astype(np.uint8)
+                #mask_gt = (mask_pred == 1).astype(np.uint8)
                 if verbose:
                     print(f"  New GT unique values: {np.unique(mask_gt)}")
                     print(f"  New Pred unique values: {np.unique(mask_pred)}")
