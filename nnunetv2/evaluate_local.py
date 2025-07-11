@@ -105,7 +105,6 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
 
     file_copy_count = 0
     folders_to_scan = [f"fold_{i}/validation" for i in range(5)]
-    subject_list = []
 
     for fold_name in folders_to_scan:
         source_dir = os.path.join(results_main_dir,fold_name)
@@ -131,8 +130,6 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
             print(f"  -> Copying '{nii_file_path.name}'")
             shutil.copy(nii_file_path, destination_path)
             file_copy_count += 1
-
-            subject_list.append(destination_path.split("/")[-1])
 
 
     # Load subject list from JSON file if subject_list is a filename/path.
