@@ -106,6 +106,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
                     subject_set.add(f[:-len(ext)])
                     break
         subject_list = sorted(subject_set)
+        print(subject_set)
 
     metrics_list = []
     for subj in subject_list:
@@ -280,6 +281,7 @@ if __name__ == "__main__":
 
     file_copy_count = 0
     folders_to_scan = [f"fold_{i}/validation" for i in range(5)]
+    subject_list = []
 
     for fold_name in folders_to_scan:
         source_dir = os.path.join(results_main_dir,fold_name)
@@ -305,6 +307,9 @@ if __name__ == "__main__":
             print(f"  -> Copying '{nii_file_path.name}'")
             shutil.copy(nii_file_path, destination_path)
             file_copy_count += 1
+
+            subject_list.append(destination_path.split("/"))
+
             
     parser = argparse.ArgumentParser(description="Evaluate 3D segmentation performance for .mha and .nii.gz masks")
     parser.add_argument("--pred_dir", type=str, required=True,
