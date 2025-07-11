@@ -164,9 +164,9 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         else:
             mask_pred = mask_pred.astype(np.uint8)
         """
-
-        mask_pred = (mask_pred == 1).astype(np.uint8)
-        mask_gt = (mask_gt == 1).astype(np.uint8)
+        # Converting anything other than tumor:1 to background:0
+        mask_pred = (mask_pred == 1).astype(np.uint8).astype(bool)
+        mask_gt = (mask_gt == 1).astype(np.uint8).astype(bool)
         # Convert masks to boolean as required by the surface-distance library.
         mask_pred = mask_pred.astype(bool)
         mask_gt = mask_gt.astype(bool)
@@ -244,6 +244,8 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
     pred_volumes = np.array([m["pred_volume"] for m in metrics_list])
     rmse_volume = np.sqrt(np.mean((pred_volumes - gt_volumes) ** 2))
 
+    shutil.rmtree(pred_dir)
+
     aggregates = {
         "mean_volumetric_dice": mean_dice,
         "mean_surface_dice": mean_surf_dice,
@@ -256,6 +258,8 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         "per_subject": metrics_list,
         "aggregates": aggregates,
     }
+
+    
 
 
 if __name__ == "__main__":
@@ -337,3 +341,5 @@ if __name__ == "__main__":
             json.dump(results, f, indent=4)
         print(f"Metrics saved to {args.save_path}")
     print(panther_msg2)
+
+    
