@@ -141,6 +141,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
 
 
         # Ensure prediction mask is binary.
+        """
         unique_vals = np.unique(mask_pred)
         if not (np.array_equal(unique_vals, [0]) or
                 np.array_equal(unique_vals, [0, 1]) or
@@ -162,11 +163,13 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
                     f"Prediction mask for subject {subj} is not binary. Unique values: {unique_vals}")
         else:
             mask_pred = mask_pred.astype(np.uint8)
-
+        
         # Convert masks to boolean as required by the surface-distance library.
         mask_pred = mask_pred.astype(bool)
         mask_gt = mask_gt.astype(bool)
+        """
 
+        mask_pred = (mask_pred == 1).astype(np.uint8)
         # Check for uniform prediction (all zeros or all ones)
         if np.all(mask_pred == 0) or np.all(mask_pred == 1):
             if verbose:
