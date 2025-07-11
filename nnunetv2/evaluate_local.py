@@ -132,8 +132,6 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
             shutil.copy(nii_file_path, destination_path)
             file_copy_count += 1
 
-            subject_list.append(destination_path.split("/"))
-
 
     # Load subject list from JSON file if subject_list is a filename/path.
     if isinstance(subject_list, (str, Path)):
