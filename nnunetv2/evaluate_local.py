@@ -106,7 +106,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
                     subject_set.add(f[:-len(ext)])
                     break
         subject_list = sorted(subject_set)
-        print(subject_set)
+        #print(subject_set)
 
     metrics_list = []
     for subj in subject_list:
@@ -127,7 +127,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
             mask_gt, spacing_gt = load_mask(gt_file)
         except Exception as e:
             if verbose:
-                print(f"Error loading subject {subj}: {e}")
+                print(f"Error loading subject (or mask and spacing) {subj}: {e}")
             continue
 
         # Check that the shapes match.
@@ -139,38 +139,23 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
                 raise ValueError(
                     f"Voxel spacing mismatch: GT spacing {spacing_gt} vs Pred spacing {spacing_pred}")
 
-        
-        # Convert ground truth mask to uint8.
-        # mask_gt = mask_gt.astype(np.uint8)
-        
-        # ------------------- MODIFICATION START -------------------
-        # The evaluation is only for the tumor (label 1).
-        # We must convert multi-class masks (e.g., 0=BG, 1=Tumor, 2=Organ)
-        # into binary masks (1=Tumor, 0=Everything Else).
-        # This is applied to both the ground truth and the prediction.
-        if verbose:
-            print(f"Subject {subj}: Remapping multi-class masks to binary for tumor (label 1).")
-            print(f"  Original GT unique values: {np.unique(mask_gt)}")
-            print(f"  Original Pred unique values: {np.unique(mask_pred)}")
-
-        mask_gt = (mask_gt == 1).astype(np.uint8)
-        mask_pred = (mask_pred == 1).astype(np.uint8)
-        
-        if verbose:
-            print(f"  New GT unique values: {np.unique(mask_gt)}")
-            print(f"  New Pred unique values: {np.unique(mask_pred)}")
-        # -------------------- MODIFICATION END --------------------
 
         # Ensure prediction mask is binary.
         unique_vals = np.unique(mask_pred)
         if not (np.array_equal(unique_vals, [0]) or
                 np.array_equal(unique_vals, [0, 1]) or
                 np.array_equal(unique_vals, [1])):
-            if len(unique_vals) == 2 and 0 in unique_vals:
+            if len(unique_vals) >= 2 and 0 in unique_vals:
                 if verbose:
-                    print(
-                        f"Prediction mask for subject {subj} has unique values {unique_vals}. Converting nonzero values to 1.")
+                    print(f"Subject {subj}: Remapping multi-class masks to binary for tumor (label 1).")
+                    print(f"  Original GT unique values: {np.unique(mask_gt)}")
+                    print(f"  Original Pred unique values: {np.unique(mask_pred)}")
+                if verbose:
+                    print(f"Prediction mask for subject {subj} has unique values {unique_vals}. Converting nonzero values to 1.")
                 mask_pred = (mask_pred > 0).astype(np.uint8)
+                if verbose:
+                    print(f"  New GT unique values: {np.unique(mask_gt)}")
+                    print(f"  New Pred unique values: {np.unique(mask_pred)}")
             else:
                 raise ValueError(
                     f"Prediction mask for subject {subj} is not binary. Unique values: {unique_vals}")
