@@ -153,7 +153,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
                 if verbose:
                     print(f"Prediction mask for subject {subj} has unique values {unique_vals}. Converting nonzero values to 1.")
                 mask_pred = (mask_pred == 1).astype(np.uint8)
-                #mask_gt = (mask_pred == 1).astype(np.uint8)
+                mask_gt = (mask_pred == 1).astype(np.uint8)
                 if verbose:
                     print(f"  New GT unique values: {np.unique(mask_gt)}")
                     print(f"  New Pred unique values: {np.unique(mask_pred)}")
