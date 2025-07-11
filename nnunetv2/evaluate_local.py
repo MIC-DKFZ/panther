@@ -92,6 +92,46 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
 
     Returns a dictionary with per-subject metrics and aggregated metrics.
     """
+
+    # Collect nnUNet_results fold_1 to fold_4 under fold_all in same directory to process
+    results_main_dir = pred_dir
+    pred_dir = os.path.join(pred_dir, "fold_all")
+
+    if not os.path.exists(pred_dir):
+        os.mkdir(pred_dir)
+
+    file_copy_count = 0
+    folders_to_scan = [f"fold_{i}/validation" for i in range(5)]
+    subject_list = []
+
+    for fold_name in folders_to_scan:
+        source_dir = os.path.join(results_main_dir,fold_name)
+
+        # Check if the source directory exists before trying to scan it
+        if not os.path.isdir(source_dir):
+            print(f"Skipping: Directory '{source_dir}' not found.")
+            continue # Move to the next folder
+
+        print(f"--- Searching in '{source_dir}' ---")
+
+        # 3. Find all files ending in .nii.gz using Path.glob()
+        nii_files = list(Path(source_dir).glob("*.nii.gz"))
+
+        if not nii_files:
+            print("  No .nii.gz files found.")
+            continue
+
+        for nii_file_path in nii_files:
+            # Define the full path for the destination file
+            destination_path = os.path.join(pred_dir, nii_file_path.name)
+
+            print(f"  -> Copying '{nii_file_path.name}'")
+            shutil.copy(nii_file_path, destination_path)
+            file_copy_count += 1
+
+            subject_list.append(destination_path.split("/"))
+
+
     # Load subject list from JSON file if subject_list is a filename/path.
     if isinstance(subject_list, (str, Path)):
         with open(subject_list, "r") as fp:
@@ -106,7 +146,6 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
                     subject_set.add(f[:-len(ext)])
                     break
         subject_list = sorted(subject_set)
-        #print(subject_set)
 
     metrics_list = []
     for subj in subject_list:
@@ -244,6 +283,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
     pred_volumes = np.array([m["pred_volume"] for m in metrics_list])
     rmse_volume = np.sqrt(np.mean((pred_volumes - gt_volumes) ** 2))
 
+    # Delete the fold_all folder after metrics are calculated to not take diskspace
     shutil.rmtree(pred_dir)
 
     aggregates = {
@@ -265,47 +305,9 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
 if __name__ == "__main__":
     import argparse
     import json
-
+    
     import shutil
     import os
-
-    results_main_dir = "/dkfz/cluster/gpu/checkpoints/OE0441/o644l/nnUNet_results/Dataset902_PANTHER_HR/nnUNetTrainer__nnUNetResEncUNetLPlansMultiTalent__3d_fullres"
-
-    dest_dir = os.path.join(results_main_dir, "fold_all")
-    if not os.path.exists(dest_dir):
-        os.mkdir(dest_dir)
-
-    file_copy_count = 0
-    folders_to_scan = [f"fold_{i}/validation" for i in range(5)]
-    subject_list = []
-
-    for fold_name in folders_to_scan:
-        source_dir = os.path.join(results_main_dir,fold_name)
-
-        # Check if the source directory exists before trying to scan it
-        if not os.path.isdir(source_dir):
-            print(f"Skipping: Directory '{source_dir}' not found.")
-            continue # Move to the next folder
-
-        print(f"--- Searching in '{source_dir}' ---")
-
-        # 3. Find all files ending in .nii.gz using Path.glob()
-        nii_files = list(Path(source_dir).glob("*.nii.gz"))
-
-        if not nii_files:
-            print("  No .nii.gz files found.")
-            continue
-
-        for nii_file_path in nii_files:
-            # Define the full path for the destination file
-            destination_path = os.path.join(dest_dir, nii_file_path.name)
-
-            print(f"  -> Copying '{nii_file_path.name}'")
-            shutil.copy(nii_file_path, destination_path)
-            file_copy_count += 1
-
-            subject_list.append(destination_path.split("/"))
-
             
     parser = argparse.ArgumentParser(description="Evaluate 3D segmentation performance for .mha and .nii.gz masks")
     parser.add_argument("--pred_dir", type=str, required=True,
