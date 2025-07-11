@@ -169,7 +169,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         mask_gt = mask_gt.astype(bool)
         """
 
-        mask_pred = (mask_pred == 1).astype(np.uint8)
+        mask_pred = (mask_pred == 1).astype(np.uint8).astype(bool)
         # Check for uniform prediction (all zeros or all ones)
         if np.all(mask_pred == 0) or np.all(mask_pred == 1):
             if verbose:
