@@ -26,6 +26,8 @@ using only .mha and .nii.gz files. This script:
 
 import os
 import json
+import shutil
+import os
 import numpy as np
 from pathlib import Path
 import SimpleITK as sitk
@@ -75,6 +77,7 @@ def find_file(directory, subject, allowed_extensions=ALLOWED_EXTENSIONS):
     Given a directory and a subject ID, returns the file path if a file with
     subject+extension exists, checking the allowed extensions.
     """
+    print(directory, subject)
     for ext in allowed_extensions:
         file_path = os.path.join(directory, subject + ext)
         if os.path.exists(file_path):
@@ -305,9 +308,6 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
 if __name__ == "__main__":
     import argparse
     import json
-    
-    import shutil
-    import os
             
     parser = argparse.ArgumentParser(description="Evaluate 3D segmentation performance for .mha and .nii.gz masks")
     parser.add_argument("--pred_dir", type=str, required=True,
