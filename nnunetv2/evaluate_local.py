@@ -66,6 +66,7 @@ def load_mask(file_path):
     image = sitk.ReadImage(file_path)
     mask = sitk.GetArrayFromImage(image)
     spacing = image.GetSpacing()  # e.g., (1.0, 1.0, 1.0)
+    print("Spacing is: ", spacing)
     if mask.ndim != 3:
         raise ValueError(
             f"Mask from {file_path} is not 3D (found shape: {mask.shape}).")
@@ -77,7 +78,6 @@ def find_file(directory, subject, allowed_extensions=ALLOWED_EXTENSIONS):
     Given a directory and a subject ID, returns the file path if a file with
     subject+extension exists, checking the allowed extensions.
     """
-    print(directory, subject)
     for ext in allowed_extensions:
         file_path = os.path.join(directory, subject + ext)
         if os.path.exists(file_path):
