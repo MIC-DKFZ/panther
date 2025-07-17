@@ -66,7 +66,6 @@ def load_mask(file_path):
     image = sitk.ReadImage(file_path)
     mask = sitk.GetArrayFromImage(image)
     spacing = image.GetSpacing()  # e.g., (1.0, 1.0, 1.0)
-    print("Spacing is: ", spacing)
     if mask.ndim != 3:
         raise ValueError(
             f"Mask from {file_path} is not 3D (found shape: {mask.shape}).")
@@ -164,6 +163,8 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         try:
             mask_pred, spacing_pred = load_mask(pred_file)
             mask_gt, spacing_gt = load_mask(gt_file)
+            print("Spacing pred is: ", spacing_pred)
+            print("Spacing gt is: ", spacing_gt)
         except Exception as e:
             if verbose:
                 print(f"Error loading subject (or mask and spacing) {subj}: {e}")
