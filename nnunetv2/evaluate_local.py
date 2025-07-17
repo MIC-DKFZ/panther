@@ -175,8 +175,6 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         try:
             mask_pred, spacing_pred = load_mask(pred_file)
             mask_gt, spacing_gt = load_mask(gt_file)
-            print("Spacing pred is: ", spacing_pred)
-            print("Spacing gt is: ", spacing_gt)
         except Exception as e:
             if verbose:
                 print(f"Error loading subject (or mask and spacing) {subj}: {e}")
