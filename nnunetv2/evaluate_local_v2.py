@@ -24,13 +24,14 @@ from pathlib import Path
 import SimpleITK as sitk
 from surface_distance import metrics as surface_metrics
 
+"""
 # NEW: Add an optional import for the detailed evaluation feature.
 try:
     from nnunetv2.evaluation.evaluate_folder import evaluate_folder
     NNUNET_INSTALLED = True
 except ImportError:
     NNUNET_INSTALLED = False
-
+"""
 
 ALLOWED_EXTENSIONS = [".mha", ".nii.gz"]
 panther_msg = r"""\n
