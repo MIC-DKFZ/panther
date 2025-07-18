@@ -52,7 +52,6 @@ except ImportError:
 # This section contains functions adapted from nnUNetv2's evaluation scripts.
 # This makes the --detailed_eval feature self-contained and independent of a full nnU-Net installation.
 # ###################################################################################################
-
 class SimpleITKIO:
     """A simple reader/writer class that mimics nnunetv2's ImageIO logic using SimpleITK."""
     def read_seg(self, path: str) -> Tuple[np.ndarray, dict]:
@@ -135,7 +134,7 @@ def compute_metrics(reference_file: str, prediction_file: str, image_reader_writ
 
 def compute_metrics_on_folder(folder_ref: str, folder_pred: str, output_file: str,
                               image_reader_writer: SimpleITKIO, file_ending: str,
-                              regions_or_labels: Union[List[int], List[Union[int, Tuple[int, ...]]]],
+                              regions_or_labels: Union[List[int], List[Union[int, ...]]],
                               ignore_label: int = None, num_processes: int = 8, chill: bool = True):
     files_pred = subfiles(folder_pred, suffix=file_ending, join=False)
     files_ref_not_present = [i for i in files_pred if not isfile(join(folder_ref, i))]
@@ -156,6 +155,13 @@ def compute_metrics_on_folder(folder_ref: str, folder_pred: str, output_file: st
     foreground_mean = {m: np.mean([means[k][m] for k in means if k != 0 and k != '0']) for m in metric_list}
     
     result_final = {'metric_per_case': results, 'mean': means, 'foreground_mean': foreground_mean}
+
+    # Apply the fix to convert numpy types to native python types before saving
+    [recursive_fix_for_json_export(i) for i in results]
+    recursive_fix_for_json_export(means)
+    recursive_fix_for_json_export(foreground_mean)
+
+    result_final = {'metric_per_case': results, 'mean': means, 'foreground_mean': foreground_mean}
     if output_file is not None:
         save_summary_json(result_final, output_file)
     return result_final
@@ -175,6 +181,18 @@ def compute_metrics_on_folder_simple(folder_ref: str, folder_pred: str, labels: 
 # ###################################################################################################
 # ### END VENDORED CODE ###
 # ###################################################################################################
+
+
+# NEW FUNCTION: Add this to fix NumPy types for JSON serialization.
+def recursive_fix_for_json_export(my_dict: dict):
+    """
+    Converts numpy types to native python types in a dictionary, recursively.
+    """
+    for k, v in my_dict.items():
+        if isinstance(v, dict):
+            recursive_fix_for_json_export(v)
+        elif isinstance(v, (np.ndarray, np.generic)):
+            my_dict[k] = v.item()
 
 
 ALLOWED_EXTENSIONS = [".mha", ".nii.gz"]
