@@ -212,6 +212,38 @@ panther_msg2 = r"""\n
 """
 
 
+def load_mask(file_path):
+    """
+    Loads a 3D mask from a file using SimpleITK.
+    Allowed extensions: .mha, .nii.gz, (also .nii, .mhd if needed).
+    Returns:
+      mask: a numpy array representation of the image.
+      spacing: a tuple with the voxel spacing (in mm).
+    Raises an error if the file is not one of the allowed types or if the image is not 3D.
+    """
+    if not any(file_path.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS):
+        raise ValueError(
+            f"Only {ALLOWED_EXTENSIONS} files are allowed. Got: {file_path}")
+    image = sitk.ReadImage(file_path)
+    mask = sitk.GetArrayFromImage(image)
+    spacing = image.GetSpacing()  # e.g., (1.0, 1.0, 1.0)
+    if mask.ndim != 3:
+        raise ValueError(
+            f"Mask from {file_path} is not 3D (found shape: {mask.shape}).")
+    return mask, spacing
+
+
+def find_file(directory, subject, allowed_extensions=ALLOWED_EXTENSIONS):
+    """
+    Given a directory and a subject ID, returns the file path if a file with
+    subject+extension exists, checking the allowed extensions.
+    """
+    for ext in allowed_extensions:
+        file_path = os.path.join(directory, subject + ext)
+        if os.path.exists(file_path):
+            return file_path
+    return None
+
 def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbose=False, include=None, exclude=None):
     """
     Evaluates segmentation metrics for all subjects.
