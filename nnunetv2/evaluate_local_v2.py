@@ -444,7 +444,7 @@ def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=N
 
     # Your script focuses on tumor (label 1). This is where you set it.
     # To evaluate multiple labels, change this to `(1, 2, ...)`
-    labels_to_evaluate = (1,) 
+    labels_to_evaluate = (1, (1, 2))
 
     for i in range(5):
         fold_pred_dir = Path(pred_dir) / f"fold_{i}" / "validation"
