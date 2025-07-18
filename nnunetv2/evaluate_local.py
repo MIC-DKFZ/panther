@@ -27,7 +27,6 @@ using only .mha and .nii.gz files. This script:
 import os
 import json
 import shutil
-import os
 import numpy as np
 from pathlib import Path
 import SimpleITK as sitk
