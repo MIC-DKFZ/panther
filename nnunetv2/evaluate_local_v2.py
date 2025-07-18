@@ -1,19 +1,27 @@
+#  Copyright 2025 Diagnostic Image Analysis Group, Radboudumc, Nijmegen, The Netherlands
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+# This code uses the surface-distance library by DeepMind.
+# Installation instructions available at: https://github.com/deepmind/surface-distance
 """
 Evaluate 3D segmentation performance for all subjects in pred_dir,
-using only .mha and .nii.gz files. This script offers two modes:
-
-1. PANTHER Mode (Default):
- - Aggregates all folds into a single group.
- - Computes surface-based metrics (Dice, Surface Dice, Hausdorff95, MASD).
- - Computes tumor volumes and aggregates metrics (mean/RMSE).
- - Output is a single JSON with aggregated results.
-
-2. Detailed Fold-by-Fold Mode (with --detailed_eval):
- - Requires nnunetv2 to be installed.
- - Evaluates each fold (0-4) separately.
- - Generates a detailed, nnU-Net style summary.json for each fold.
- - Metrics include Dice, IoU, TP, FP, FN, TN per class.
- - Saves results into a new directory named after the --save_path argument.
+using only .mha and .nii.gz files. This script:
+ - Loads 3D masks and extracts voxel spacing.
+ - Ensures prediction masks are binary (0 and 1).
+ - If a prediction mask is uniform (all zeros or all ones), all metrics are set to the lowest value possible.
+ - Computes surface-based metrics (Dice, Surface Dice at 5mm, Robust Hausdorff95, MASD).
+ - Computes tumor volumes and later aggregates metrics (mean for most and RMSE for volumes).
 """
 
 import os
@@ -23,15 +31,151 @@ import numpy as np
 from pathlib import Path
 import SimpleITK as sitk
 from surface_distance import metrics as surface_metrics
+import multiprocessing
+from copy import deepcopy
+from typing import Tuple, List, Union
 
-"""
-# NEW: Add an optional import for the detailed evaluation feature.
+# --- DEPENDENCY CHECK FOR VENDORED CODE ---
+# The detailed evaluation logic below requires 'batchgenerators'.
 try:
-    from nnunetv2.evaluation.evaluate_folder import evaluate_folder
-    NNUNET_INSTALLED = True
+    from batchgenerators.utilities.file_and_folder_operations import subfiles, join, save_json, isfile
 except ImportError:
-    NNUNET_INSTALLED = False
-"""
+    raise ImportError(
+        "The '--detailed_eval' flag uses logic that requires the 'batchgenerators' package. "
+        "Please install it using 'pip install batchgenerators'."
+    )
+# --- END DEPENDENCY CHECK ---
+
+
+# ###################################################################################################
+# ### NNUNETV2 EVALUATION LOGIC (VENDORED) ###
+# This section contains functions adapted from nnUNetv2's evaluation scripts.
+# This makes the --detailed_eval feature self-contained and independent of a full nnU-Net installation.
+# ###################################################################################################
+
+class SimpleITKIO:
+    """A simple reader/writer class that mimics nnunetv2's ImageIO logic using SimpleITK."""
+    def read_seg(self, path: str) -> Tuple[np.ndarray, dict]:
+        img = sitk.ReadImage(path)
+        properties = {
+            'spacing': img.GetSpacing(),
+            'direction': img.GetDirection(),
+            'origin': img.GetOrigin(),
+        }
+        return sitk.GetArrayFromImage(img), properties
+
+    def write_seg(self, seg: np.ndarray, path: str, properties: dict):
+        img = sitk.GetImageFromArray(seg)
+        img.SetSpacing(properties['spacing'])
+        img.SetDirection(properties['direction'])
+        img.SetOrigin(properties['origin'])
+        sitk.WriteImage(img, path)
+
+
+def label_or_region_to_key(label_or_region: Union[int, Tuple[int]]):
+    return str(label_or_region)
+
+
+def save_summary_json(results: dict, output_file: str):
+    """Saves a summary JSON file, converting tuple keys to strings."""
+    results_converted = deepcopy(results)
+    if 'mean' in results_converted:
+        results_converted['mean'] = {label_or_region_to_key(k): v for k, v in results_converted['mean'].items()}
+    if 'metric_per_case' in results_converted:
+        for i in range(len(results_converted["metric_per_case"])):
+            results_converted["metric_per_case"][i]['metrics'] = \
+                {label_or_region_to_key(k): v for k, v in results_converted["metric_per_case"][i]['metrics'].items()}
+    save_json(results_converted, output_file, sort_keys=True)
+
+
+def region_or_label_to_mask(segmentation: np.ndarray, region_or_label: Union[int, Tuple[int, ...]]) -> np.ndarray:
+    if np.isscalar(region_or_label):
+        return segmentation == region_or_label
+    else:
+        mask = np.zeros_like(segmentation, dtype=bool)
+        for r in region_or_label:
+            mask[segmentation == r] = True
+    return mask
+
+
+def compute_tp_fp_fn_tn(mask_ref: np.ndarray, mask_pred: np.ndarray, ignore_mask: np.ndarray = None):
+    if ignore_mask is None:
+        use_mask = np.ones_like(mask_ref, dtype=bool)
+    else:
+        use_mask = ~ignore_mask
+    tp = np.sum((mask_ref & mask_pred) & use_mask)
+    fp = np.sum(((~mask_ref) & mask_pred) & use_mask)
+    fn = np.sum((mask_ref & (~mask_pred)) & use_mask)
+    tn = np.sum(((~mask_ref) & (~mask_pred)) & use_mask)
+    return tp, fp, fn, tn
+
+
+def compute_metrics(reference_file: str, prediction_file: str, image_reader_writer: SimpleITKIO,
+                    labels_or_regions: Union[List[int], List[Union[int, Tuple[int, ...]]]],
+                    ignore_label: int = None) -> dict:
+    seg_ref, _ = image_reader_writer.read_seg(reference_file)
+    seg_pred, _ = image_reader_writer.read_seg(prediction_file)
+    ignore_mask = seg_ref == ignore_label if ignore_label is not None else None
+
+    results = {'reference_file': reference_file, 'prediction_file': prediction_file, 'metrics': {}}
+    for r in labels_or_regions:
+        results['metrics'][r] = {}
+        mask_ref = region_or_label_to_mask(seg_ref, r)
+        mask_pred = region_or_label_to_mask(seg_pred, r)
+        tp, fp, fn, tn = compute_tp_fp_fn_tn(mask_ref, mask_pred, ignore_mask)
+        if tp + fp + fn == 0:
+            results['metrics'][r]['Dice'] = np.nan
+            results['metrics'][r]['IoU'] = np.nan
+        else:
+            results['metrics'][r]['Dice'] = 2 * tp / (2 * tp + fp + fn)
+            results['metrics'][r]['IoU'] = tp / (tp + fp + fn)
+        results['metrics'][r].update({'FP': fp, 'TP': tp, 'FN': fn, 'TN': tn, 'n_pred': fp + tp, 'n_ref': fn + tp})
+    return results
+
+
+def compute_metrics_on_folder(folder_ref: str, folder_pred: str, output_file: str,
+                              image_reader_writer: SimpleITKIO, file_ending: str,
+                              regions_or_labels: Union[List[int], List[Union[int, Tuple[int, ...]]]],
+                              ignore_label: int = None, num_processes: int = 8, chill: bool = True):
+    files_pred = subfiles(folder_pred, suffix=file_ending, join=False)
+    files_ref_not_present = [i for i in files_pred if not isfile(join(folder_ref, i))]
+    if not chill and len(files_ref_not_present) > 0:
+        raise RuntimeError(f"Some files in folder_pred are not in folder_ref: {files_ref_not_present}")
+        
+    files_ref = [join(folder_ref, i) for i in files_pred]
+    files_pred = [join(folder_pred, i) for i in files_pred]
+
+    with multiprocessing.get_context("spawn").Pool(num_processes) as pool:
+        results = pool.starmap(
+            compute_metrics,
+            zip(files_ref, files_pred, [image_reader_writer] * len(files_pred), [regions_or_labels] * len(files_pred), [ignore_label] * len(files_pred))
+        )
+
+    metric_list = list(results[0]['metrics'][regions_or_labels[0]].keys())
+    means = {r: {m: np.nanmean([i['metrics'][r][m] for i in results]) for m in metric_list} for r in regions_or_labels}
+    foreground_mean = {m: np.mean([means[k][m] for k in means if k != 0 and k != '0']) for m in metric_list}
+    
+    result_final = {'metric_per_case': results, 'mean': means, 'foreground_mean': foreground_mean}
+    if output_file is not None:
+        save_summary_json(result_final, output_file)
+    return result_final
+
+
+def compute_metrics_on_folder_simple(folder_ref: str, folder_pred: str, labels: Union[Tuple[int, ...], List[int]],
+                                     output_file: str = None, num_processes: int = 8,
+                                     ignore_label: int = None, chill: bool = False):
+    example_file = subfiles(folder_ref, join=True)[0]
+    file_ending = os.path.splitext(example_file)[-1]
+    rw = SimpleITKIO()
+    if output_file is None:
+        output_file = join(folder_pred, 'summary.json')
+    compute_metrics_on_folder(folder_ref, folder_pred, output_file, rw, file_ending, labels,
+                              ignore_label=ignore_label, num_processes=num_processes, chill=chill)
+
+# ###################################################################################################
+# ### END VENDORED CODE ###
+# ###################################################################################################
+
 
 ALLOWED_EXTENSIONS = [".mha", ".nii.gz"]
 panther_msg = r"""\n
@@ -50,44 +194,19 @@ panther_msg2 = r"""\n
 """
 
 
-def load_mask(file_path):
-    """
-    Loads a 3D mask from a file using SimpleITK.
-    Allowed extensions: .mha, .nii.gz, (also .nii, .mhd if needed).
-    Returns:
-      mask: a numpy array representation of the image.
-      spacing: a tuple with the voxel spacing (in mm).
-    Raises an error if the file is not one of the allowed types or if the image is not 3D.
-    """
-    if not any(file_path.lower().endswith(ext) for ext in ALLOWED_EXTENSIONS):
-        raise ValueError(
-            f"Only {ALLOWED_EXTENSIONS} files are allowed. Got: {file_path}")
-    image = sitk.ReadImage(file_path)
-    mask = sitk.GetArrayFromImage(image)
-    spacing = image.GetSpacing()  # e.g., (1.0, 1.0, 1.0)
-    if mask.ndim != 3:
-        raise ValueError(
-            f"Mask from {file_path} is not 3D (found shape: {mask.shape}).")
-    return mask, spacing
-
-
-def find_file(directory, subject, allowed_extensions=ALLOWED_EXTENSIONS):
-    """
-    Given a directory and a subject ID, returns the file path if a file with
-    subject+extension exists, checking the allowed extensions.
-    """
-    for ext in allowed_extensions:
-        file_path = os.path.join(directory, subject + ext)
-        if os.path.exists(file_path):
-            return file_path
-    return None
-
-
-# The original evaluate_segmentation_performance function is unchanged.
 def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbose=False, include=None, exclude=None):
-    # (Your original function from the previous step goes here, it's quite long so I'm omitting it for brevity)
-    # ... It should contain the include/exclude logic we added before.
-    # --- The function body is identical to the previous answer ---
+    """
+    Evaluates segmentation metrics for all subjects.
+    - pred_dir: Directory containing prediction files (.mha or .nii.gz).
+    - gt_dir: Directory containing ground truth files (.mha or .nii.gz).
+    - subject_list: Either a list of subject IDs or a JSON file (with "subject_list" key).
+    - verbose: If True, prints per-subject metrics.
+    - include: If set, only processes files ending with this string.
+    - exclude: If set, skips files ending with this string.
+
+    Returns a dictionary with per-subject metrics and aggregated metrics.
+    """
+
     results_main_dir = pred_dir
     pred_dir = os.path.join(pred_dir, "fold_all")
 
@@ -144,46 +263,95 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         pred_file = find_file(pred_dir, subj)
         gt_file = find_file(gt_dir, subj)
 
-        if pred_file is None or gt_file is None: continue
+        if pred_file is None:
+            if verbose:
+                print(f"Prediction file not found for subject {subj}")
+            continue
+        if gt_file is None:
+            if verbose:
+                print(f"Ground truth file not found for subject {subj}")
+            continue
 
         try:
             mask_pred, spacing_pred = load_mask(pred_file)
             mask_gt, spacing_gt = load_mask(gt_file)
         except Exception as e:
-            if verbose: print(f"Error loading subject {subj}: {e}")
+            if verbose:
+                print(f"Error loading subject (or mask and spacing) {subj}: {e}")
             continue
 
-        if mask_gt.shape != mask_pred.shape or not np.allclose(spacing_gt, spacing_pred, rtol=0, atol=1e-4):
-            print(f"Shape or spacing mismatch for {subj}, skipping.")
-            continue
+        # Check that the shapes match.
+        if mask_gt.shape != mask_pred.shape:
+            raise ValueError(
+                f"Shape mismatch for subject {subj}: GT shape {mask_gt.shape} vs Pred shape {mask_pred.shape}")
+        # Check that the voxel spacings match.
+        if not np.allclose(spacing_gt, spacing_pred, rtol=0, atol=1e-4):
+                raise ValueError(
+                    f"Voxel spacing mismatch: GT spacing {spacing_gt} vs Pred spacing {spacing_pred}")
 
-        mask_pred = (mask_pred == 1).astype(bool)
-        mask_gt = (mask_gt == 1).astype(bool)
+
+        # Ensure prediction mask is binary.
+        mask_pred = (mask_pred == 1).astype(np.uint8).astype(bool)
+        mask_gt = (mask_gt == 1).astype(np.uint8).astype(bool)
+        # Convert masks to boolean as required by the surface-distance library.
+        mask_pred = mask_pred.astype(bool)
+        mask_gt = mask_gt.astype(bool)
+
         
+        # Check for uniform prediction (all zeros or all ones)
         if np.all(mask_pred == 0) or np.all(mask_pred == 1):
-            max_distance = np.linalg.norm(np.array(mask_gt.shape) * np.array(spacing_gt))
+            if verbose:
+                print(f"Subject {subj}: Prediction mask is uniform. Metrics set to 0.")
+            max_distance = np.linalg.norm(
+                np.array(mask_gt.shape) * np.array(spacing_gt))
             subj_metrics = {
-                "subject": subj, "volumetric_dice": 0.0, "surface_dice": 0.0,
-                "hausdorff95": max_distance, "masd": max_distance,
-                "gt_volume": np.sum(mask_gt) * np.prod(spacing_gt), "pred_volume": 0.0,
+                "subject": subj,
+                "volumetric_dice": 0.0,
+                "surface_dice": 0.0,
+                "hausdorff95": max_distance,
+                "masd": max_distance,
+                "gt_volume": np.sum(mask_gt) * np.prod(spacing_gt),
+                "pred_volume": 0.0,
+                "time_score": 0.0
             }
-        else:
-            surface_distances = surface_metrics.compute_surface_distances(mask_gt, mask_pred, spacing_mm=spacing_gt)
-            dice = surface_metrics.compute_dice_coefficient(mask_gt, mask_pred)
-            surf_dice = surface_metrics.compute_surface_dice_at_tolerance(surface_distances, tolerance_mm=5)
-            hausdorff95 = surface_metrics.compute_robust_hausdorff(surface_distances, percent=95)
-            avg_gt_to_pred, avg_pred_to_gt = surface_metrics.compute_average_surface_distance(surface_distances)
-            masd = (avg_gt_to_pred + avg_pred_to_gt) / 2.0
-            voxel_volume = np.prod(spacing_gt)
-            gt_volume = np.sum(mask_gt) * voxel_volume
-            pred_volume = np.sum(mask_pred) * voxel_volume
+            metrics_list.append(subj_metrics)
+            continue
 
-            subj_metrics = {
-                "subject": subj, "volumetric_dice": dice, "surface_dice": surf_dice,
-                "hausdorff95": hausdorff95, "masd": masd,
-                "gt_volume": gt_volume, "pred_volume": pred_volume,
-            }
+        # Compute surface-based metrics using the ground truth spacing.
+        surface_distances = surface_metrics.compute_surface_distances(
+            mask_gt, mask_pred, spacing_mm=spacing_gt)
+        dice = surface_metrics.compute_dice_coefficient(mask_gt, mask_pred)
+        surf_dice = surface_metrics.compute_surface_dice_at_tolerance(
+            surface_distances, tolerance_mm=5)
+        hausdorff95 = surface_metrics.compute_robust_hausdorff(
+            surface_distances, percent=95)
+        avg_gt_to_pred, avg_pred_to_gt = surface_metrics.compute_average_surface_distance(
+            surface_distances)
+        masd = (avg_gt_to_pred + avg_pred_to_gt) / 2.0
+
+        # Compute tumor volumes using the ground truth spacing.
+        voxel_volume = np.prod(spacing_gt)
+        gt_volume = np.sum(mask_gt) * voxel_volume
+        pred_volume = np.sum(mask_pred) * voxel_volume
+
+        subj_metrics = {
+            "subject": subj,
+            "volumetric_dice": dice,
+            "surface_dice": surf_dice,
+            "hausdorff95": hausdorff95,
+            "masd": masd,
+            "gt_volume": gt_volume,
+            "pred_volume": pred_volume,
+        }
         metrics_list.append(subj_metrics)
+        if verbose:
+            print(f"Subject: {subj}")
+            print(f"  Volumetric Dice: {dice:.4f}")
+            print(f"  Surface Dice (5mm): {surf_dice:.4f}")
+            print(f"  Hausdorff95: {hausdorff95:.4f}")
+            print(f"  MASD: {masd:.4f}")
+            print(
+                f"  GT Volume: {gt_volume:.2f} mm³, Pred Volume: {pred_volume:.2f} mm³")
 
     if len(metrics_list) == 0:
         raise RuntimeError("No subjects were processed successfully!")
@@ -196,33 +364,39 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
     pred_volumes = np.array([m["pred_volume"] for m in metrics_list])
     rmse_volume = np.sqrt(np.mean((pred_volumes - gt_volumes) ** 2))
     
-    shutil.rmtree(pred_dir)
+    # Delete the fold_all folder only if it was created by this script
+    if os.path.exists(pred_dir):
+        shutil.rmtree(pred_dir)
 
     aggregates = {
-        "mean_volumetric_dice": mean_dice, "mean_surface_dice": mean_surf_dice,
-        "mean_hausdorff95": mean_hausdorff95, "mean_masd": mean_masd,
+        "mean_volumetric_dice": mean_dice,
+        "mean_surface_dice": mean_surf_dice,
+        "mean_hausdorff95": mean_hausdorff95,
+        "mean_masd": mean_masd,
         "tumor_burden_rmse": rmse_volume,
     }
-    return {"per_subject": metrics_list, "aggregates": aggregates}
+
+    return {
+        "per_subject": metrics_list,
+        "aggregates": aggregates,
+    }
 
 
-# NEW: Function for detailed fold-by-fold evaluation
+# MODIFIED to use local functions
 def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=None):
     """
-    Uses nnunetv2.evaluation.evaluate_folder to generate a detailed summary.json
+    Uses the self-contained evaluation logic to generate a detailed summary.json
     for each fold, saving them into a new directory.
     """
-    # Create the main output directory from the save_path name
     output_dir = Path(save_path).with_suffix('')
     os.makedirs(output_dir, exist_ok=True)
     print(f"Saving detailed fold summaries to: {output_dir}")
 
-    # The label to evaluate. Your original script focuses on label 1 (tumor).
-    # The example you gave has "(1, 2)", which evaluates classes 1 and 2 and also merges them.
-    # We will stick to label 1 to match your script's logic. Change if you have more classes.
+    # Your script focuses on tumor (label 1). This is where you set it.
+    # To evaluate multiple labels, change this to `(1, 2, ...)`
     labels_to_evaluate = (1,) 
 
-    for i in range(5): # Loop through fold_0 to fold_4
+    for i in range(5):
         fold_pred_dir = Path(pred_dir) / f"fold_{i}" / "validation"
         
         if not fold_pred_dir.is_dir():
@@ -231,15 +405,10 @@ def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=N
             
         print(f"\n--- Processing {fold_pred_dir} ---")
 
-        # Since evaluate_folder works on directories, we create a temporary directory
-        # containing only the files that match our include/exclude criteria.
         temp_filtered_dir = output_dir / f"temp_fold_{i}_filtered_preds"
         os.makedirs(temp_filtered_dir, exist_ok=True)
 
-        all_files = list(fold_pred_dir.glob("*.nii.gz"))
-        
-        # Apply filters
-        files_to_process = all_files
+        files_to_process = list(fold_pred_dir.glob("*.nii.gz"))
         if include:
             files_to_process = [f for f in files_to_process if f.name.endswith(include)]
         if exclude:
@@ -250,25 +419,22 @@ def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=N
             shutil.rmtree(temp_filtered_dir)
             continue
             
-        # Copy the filtered files to the temporary directory
         print(f"  Found {len(files_to_process)} matching files to evaluate.")
         for f_path in files_to_process:
             shutil.copy(f_path, temp_filtered_dir / f_path.name)
             
-        # Define the output file for this fold's summary
         fold_summary_file = output_dir / f"fold_{i}_summary.json"
         
-        # Run the nnU-Net evaluation
-        evaluate_folder(
-            folder_with_gts=str(gt_dir),
-            folder_with_predictions=str(temp_filtered_dir),
-            output_file=str(fold_summary_file),
+        # --- THIS IS THE KEY CHANGE ---
+        # Call the self-contained function instead of an imported one
+        compute_metrics_on_folder_simple(
+            folder_ref=str(gt_dir),
+            folder_pred=str(temp_filtered_dir),
             labels=labels_to_evaluate,
-            # num_processes=... # you can add this for speed
+            output_file=str(fold_summary_file),
+            num_processes=8 # Adjust as needed
         )
         print(f"  -> Detailed summary saved to: {fold_summary_file}")
-        
-        # Clean up the temporary directory
         shutil.rmtree(temp_filtered_dir)
 
 
@@ -276,59 +442,49 @@ if __name__ == "__main__":
     import json
     import argparse
 
-
     parser = argparse.ArgumentParser(description="Evaluate 3D segmentation performance.")
-    parser.add_argument("--pred_dir", type=str, required=True,
-                        help="Directory containing prediction folds (e.g., nnUNet_results/DatasetX/Trainer__Plans__3d_fullres/..)")
-    parser.add_argument("--gt_dir", type=str, required=True,
-                        help="Directory containing ground truth files.")
-    parser.add_argument("--subject_list", type=str, default=None,
-                        help="Optional JSON file with {'subject_list': [...]}, or a comma-separated list of subject IDs. (Used in default mode only)")
-    parser.add_argument("--save_path", type=str, default=None,
-                        help="Path to save the metrics JSON. In detailed mode, this is used as a base name for the output directory.")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Enable verbose output (for default mode).")
-    parser.add_argument("--include", type=str, default=None,
-                        help="Only include files ending with this string (e.g., '_0001.nii.gz').")
-    parser.add_argument("--exclude", type=str, default=None,
-                        help="Exclude files ending with this string (e.g., '_0001.nii.gz').")
-    
-    # NEW ARGUMENT
+    # ... (all your argument parsing code remains the same) ...
+    parser.add_argument("--pred_dir", type=str, required=True, help="...")
+    parser.add_argument("--gt_dir", type=str, required=True, help="...")
+    parser.add_argument("--save_path", type=str, default=None, help="...")
+    parser.add_argument("--include", type=str, default=None, help="...")
+    parser.add_argument("--exclude", type=str, default=None, help="...")
     parser.add_argument("--detailed_eval", action="store_true",
-                        help="Use nnunetv2-style evaluation to generate a detailed summary.json for each fold. Requires --save_path.")
-
+                        help="Use self-contained nnU-Net-style evaluation for a detailed summary.json per fold.")
+    parser.add_argument("--verbose", action="store_true", help="...")
+    parser.add_argument("--subject_list", type=str, default=None, help="...")
+    
     args = parser.parse_args()
     
-    # NEW LOGIC to decide which evaluation to run
     if args.detailed_eval:
-        if not NNUNET_INSTALLED:
-            raise ImportError("The '--detailed_eval' flag requires the 'nnunetv2' package. Please install it using 'pip install nnunetv2'.")
         if not args.save_path:
-            raise ValueError("The '--detailed_eval' flag requires a --save_path to be specified for the output directory.")
-        print("\n<Running Detailed Fold-by-Fold Evaluation>")
+            raise ValueError("The '--detailed_eval' flag requires a --save_path to be specified.")
+        print("\n<Running Detailed Fold-by-Fold Evaluation using self-contained logic>")
         run_detailed_evaluation(args.pred_dir, args.gt_dir, args.save_path, args.include, args.exclude)
 
     else: # Default PANTHER evaluation
         print(panther_msg)
-        subject_list = args.subject_list
-        if subject_list is not None:
-            if subject_list.endswith(".json"):
-                with open(subject_list, "r") as fp:
-                    subject_list = json.load(fp)["subject_list"]
-            else:
-                subject_list = [s.strip() for s in subject_list.split(",")]
 
-        results = evaluate_segmentation_performance(args.pred_dir, args.gt_dir,
-                                                      subject_list=subject_list,
-                                                      verbose=args.verbose,
-                                                      include=args.include,
-                                                      exclude=args.exclude)
-        print("Evaluation Metrics:")
-        print(json.dumps(results, indent=4))
+    subject_list = args.subject_list
+    if subject_list is not None:
+        if subject_list.endswith(".json"):
+            with open(subject_list, "r") as fp:
+                subject_list = json.load(fp)["subject_list"]
+        else:
+            subject_list = [s.strip() for s in subject_list.split(",")]
 
-        if args.save_path:
-            with open(args.save_path, "w") as f:
-                json.dump(results, f, indent=4)
-            print(f"Metrics saved to {args.save_path}")
+    results = evaluate_segmentation_performance(args.pred_dir, args.gt_dir,
+                                                subject_list=subject_list,
+                                                verbose=args.verbose,
+                                                include=args.include,
+                                                exclude=args.exclude)
+
+    print("Evaluation Metrics:")
+    print(json.dumps(results, indent=4))
+
+    if args.save_path:
+        with open(args.save_path, "w") as f:
+            json.dump(results, f, indent=4)
+        print(f"Metrics saved to {args.save_path}")
 
     print(panther_msg2)
