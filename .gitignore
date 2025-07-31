@@ -112,5 +112,11 @@ ENV/
 *.jpeg
 
 *.model
+*.tar.gz
+nnUNet_raw
+nnUNet_preprocessed
+nnUNet_results
+_model
+_test
 
 !documentation/assets/scribble_example.png

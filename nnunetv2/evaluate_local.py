@@ -328,4 +328,3 @@ if __name__ == "__main__":
             json.dump(results, f, indent=4)
         print(f"Metrics saved to {args.save_path}")
     print(panther_msg2)
-    
