@@ -244,7 +244,7 @@ def find_file(directory, subject, allowed_extensions=ALLOWED_EXTENSIONS):
             return file_path
     return None
 
-def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbose=False, include=None, exclude=None):
+def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbose=False, include=None, exclude=None, val_best=False):
     """
     Evaluates segmentation metrics for all subjects.
     - pred_dir: Directory containing prediction files (.mha or .nii.gz).
@@ -264,7 +264,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         os.mkdir(pred_dir)
 
     file_copy_count = 0
-    folders_to_scan = [f"fold_{i}/validation" for i in range(5)]
+    folders_to_scan = [f"fold_{i}/"+("validation_best" if val_best else "validation") for i in range(5)]
 
     for fold_name in folders_to_scan:
         source_dir = os.path.join(results_main_dir,fold_name)
@@ -433,7 +433,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
 
 
 # MODIFIED to use local functions
-def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=None):
+def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=None, val_best=False):
     """
     Uses the self-contained evaluation logic to generate a detailed summary.json
     for each fold, saving them into a new directory.
@@ -447,7 +447,7 @@ def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=N
     labels_to_evaluate = (1, (1, 2))
 
     for i in range(5):
-        fold_pred_dir = Path(pred_dir) / f"fold_{i}" / "validation"
+        fold_pred_dir = Path(pred_dir) / f"fold_{i}" / ("validation_best" if val_best else "validation")
         
         if not fold_pred_dir.is_dir():
             print(f"Skipping: Directory '{fold_pred_dir}' not found.")
@@ -503,6 +503,7 @@ if __name__ == "__main__":
                         help="Use self-contained nnU-Net-style evaluation for a detailed summary.json per fold.")
     parser.add_argument("--verbose", action="store_true", help="...")
     parser.add_argument("--subject_list", type=str, default=None, help="...")
+    parser.add_argument("--val_best", action="store_true", help="...")
     
     args = parser.parse_args()
     
@@ -510,7 +511,7 @@ if __name__ == "__main__":
         if not args.save_path:
             raise ValueError("The '--detailed_eval' flag requires a --save_path to be specified.")
         print("\n<Running Detailed Fold-by-Fold Evaluation using self-contained logic>")
-        run_detailed_evaluation(args.pred_dir, args.gt_dir, args.save_path, args.include, args.exclude)
+        run_detailed_evaluation(args.pred_dir, args.gt_dir, args.save_path, args.include, args.exclude, args.val_best)
 
     else: # Default PANTHER evaluation
         print(panther_msg)
@@ -527,7 +528,8 @@ if __name__ == "__main__":
                                                 subject_list=subject_list,
                                                 verbose=args.verbose,
                                                 include=args.include,
-                                                exclude=args.exclude)
+                                                exclude=args.exclude,
+                                                val_best=args.val_best)
 
     print("Evaluation Metrics:")
     print(json.dumps(results, indent=4))
