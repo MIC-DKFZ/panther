@@ -264,7 +264,7 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         os.mkdir(pred_dir)
 
     file_copy_count = 0
-    folders_to_scan = [f"fold_{i}/"+("validation_best" if val_best else "validation") for i in range(5)]
+    folders_to_scan = [f"fold_{i}/"+("validation" if val_best else "validation_final") for i in range(5)]
 
     for fold_name in folders_to_scan:
         source_dir = os.path.join(results_main_dir,fold_name)
@@ -447,7 +447,7 @@ def run_detailed_evaluation(pred_dir, gt_dir, save_path, include=None, exclude=N
     labels_to_evaluate = (1, (1, 2))
 
     for i in range(5):
-        fold_pred_dir = Path(pred_dir) / f"fold_{i}" / ("validation_best" if val_best else "validation")
+        fold_pred_dir = Path(pred_dir) / f"fold_{i}" / ("validation" if val_best else "validation_final")
         
         if not fold_pred_dir.is_dir():
             print(f"Skipping: Directory '{fold_pred_dir}' not found.")
