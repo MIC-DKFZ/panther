@@ -39,8 +39,14 @@ class nnUNetTrainer1e3_150e(nnUNetTrainer):
     3. At the end of training, automatically evaluates both the 'final' and 'best' checkpoints
        and saves their validation results to 'validation_final' and 'validation' respectively.
     """
-    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True, device: torch.device = torch.device('cuda')):
-        super().__init__(plans, configuration, fold, dataset_json, unpack_dataset, device)
+    def __init__(
+        self,
+        plans: dict,
+        configuration: str,
+        fold: int,
+        dataset_json: dict,
+        device: torch.device = torch.device("cuda"),
+    ):
         self.initial_lr = 1e-3
         self.num_epochs = 150
 
