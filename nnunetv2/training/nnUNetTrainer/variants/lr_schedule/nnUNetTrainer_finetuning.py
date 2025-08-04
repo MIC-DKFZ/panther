@@ -30,7 +30,7 @@ from nnunetv2.utilities.helpers import empty_cache
 from nnunetv2.data_augmentation.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter, NonDetMultiThreadedAugmenter
 
 
-class nnUNetTrainer1e3150e(nnUNetTrainer):
+class nnUNetTrainer1e3_150e(nnUNetTrainer):
     """
     This trainer customizes the nnUNetTrainer with three key features:
     1. Sets the initial learning rate to 1e-3.
@@ -93,4 +93,3 @@ class nnUNetTrainer1e3150e(nnUNetTrainer):
 
         empty_cache(self.device)
         self.print_to_log_file("Training and all validations are finished.")
-        
