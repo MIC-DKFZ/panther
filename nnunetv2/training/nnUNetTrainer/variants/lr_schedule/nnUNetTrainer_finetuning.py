@@ -25,9 +25,10 @@ import sys
 import shutil
 
 from os.path import join, isfile, isdir
-from nnunetv2.training.nnUNetTrainer.nnUNetTrainer import nnUNetTrainer
 from nnunetv2.utilities.helpers import empty_cache
-from nnunetv2.data_augmentation.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter, NonDetMultiThreadedAugmenter
+from batchgenerators.dataloading.multi_threaded_augmenter import MultiThreadedAugmenter
+from batchgenerators.dataloading.nondet_multi_threaded_augmenter import NonDetMultiThreadedAugmenter
+
 
 
 class nnUNetTrainer1e3_150e(nnUNetTrainer):
