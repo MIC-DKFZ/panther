@@ -138,7 +138,7 @@ class nnUNetTrainer1e3_150e_polylrlin(nnUNetTrainer):
                                     momentum=0.99, nesterov=True)
 
         self.print_to_log_file("Using custom LR scheduler: PolyLRScheduler_lin_warmup")
-        self.lr_scheduler = PolyLRScheduler_lin_warmup(self.optimizer, self.initial_lr, self.num_epochs)
+        self.lr_scheduler = PolyLRScheduler_lin_warmup(self.optimizer, self.initial_lr, warmup_steps=50, max_steps=self.num_epochs)    
         return self.optimizer, self.lr_scheduler
 
     def on_train_end(self):
