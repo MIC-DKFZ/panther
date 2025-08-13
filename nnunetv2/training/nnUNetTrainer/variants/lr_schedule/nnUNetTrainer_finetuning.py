@@ -107,6 +107,31 @@ class nnUNetTrainer1e3_150e(nnUNetTrainerDualVal):
         self.initial_lr = 1e-3
         self.num_epochs = 150
 
+
+class nnUNetTrainer1e4_150e(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-4
+        self.num_epochs = 150
+
+
+class nnUNetTrainer2e3_150e(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 2e-3
+        self.num_epochs = 150
+
+
+class nnUNetTrainer1e3_100e(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+
+
 class nnUNetTrainer1e3_300e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
@@ -121,22 +146,6 @@ class nnUNetTrainer1e3_150e_polylrlin(nnUNetTrainerDualVal):
         super().__init__(plans, configuration, fold, dataset_json, device)
         self.initial_lr = 1e-3
         self.num_epochs = 150
-
-    def configure_optimizers(self):
-        self.optimizer = torch.optim.SGD(self.network.parameters(), self.initial_lr, weight_decay=self.weight_decay,
-                                    momentum=0.99, nesterov=True)
-
-        self.print_to_log_file("Using custom LR scheduler: PolyLRScheduler_lin_warmup")
-        self.lr_scheduler = PolyLRScheduler_lin_warmup(self.optimizer, self.initial_lr, warmup_steps=50, max_steps=self.num_epochs)    
-        return self.optimizer, self.lr_scheduler
-
-
-class nnUNetTrainer1e3_1000e_polylrlin(nnUNetTrainerDualVal):
-    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
-                 device: torch.device = torch.device('cuda')):
-        super().__init__(plans, configuration, fold, dataset_json, device)
-        self.initial_lr = 1e-3
-        self.num_epochs = 1000
 
     def configure_optimizers(self):
         self.optimizer = torch.optim.SGD(self.network.parameters(), self.initial_lr, weight_decay=self.weight_decay,
@@ -167,5 +176,24 @@ class nnUNetTrainer1e3_150e_cosineanneal(nnUNetTrainerDualVal):
         )
         
         return optimizer, lr_scheduler
+    
+
+class nnUNetTrainer1e3_1000e_polylrlin(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 1000
+
+    def configure_optimizers(self):
+        self.optimizer = torch.optim.SGD(self.network.parameters(), self.initial_lr, weight_decay=self.weight_decay,
+                                    momentum=0.99, nesterov=True)
+
+        self.print_to_log_file("Using custom LR scheduler: PolyLRScheduler_lin_warmup")
+        self.lr_scheduler = PolyLRScheduler_lin_warmup(self.optimizer, self.initial_lr, warmup_steps=50, max_steps=self.num_epochs)    
+        return self.optimizer, self.lr_scheduler
+
+
+
 
 
