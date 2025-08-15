@@ -431,6 +431,9 @@ class nnUNetTrainerDA5(nnUNetTrainer):
                 mask = target != self.label_manager.ignore_label
                 # CAREFUL that you don't rely on target after this line!
                 target[target == self.label_manager.ignore_label] = 0
+
+                target = target.long() # Casting to LONG bc get_tp_fp_fn_tn requires int or bool
+                
             else:
                 if target.dtype == torch.bool:
                     mask = ~target[:, -1:]
