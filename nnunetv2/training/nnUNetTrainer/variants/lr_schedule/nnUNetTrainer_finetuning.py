@@ -312,6 +312,14 @@ class nnUNetTrainer1e3_200e(nnUNetTrainerDualVal):
         self.num_epochs = 200
 
 
+class nnUNetTrainer1e3_250e(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 250
+
+
 class nnUNetTrainer1e4_150e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
