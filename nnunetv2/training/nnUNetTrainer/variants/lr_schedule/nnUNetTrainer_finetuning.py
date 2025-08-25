@@ -519,6 +519,15 @@ class nnUNetTrainer1e3_50e_DA5ord0(nnUNetTrainerDualVal_DA5ord0):
         self.num_epochs = 50
 
 
+class nnUNetTrainer1e3_100e_DA5ord0(nnUNetTrainerDualVal_DA5ord0):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
+
+
 class nnUNetTrainer1e3_150e_DA5ord0(nnUNetTrainerDualVal_DA5ord0):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
@@ -526,6 +535,15 @@ class nnUNetTrainer1e3_150e_DA5ord0(nnUNetTrainerDualVal_DA5ord0):
 
         self.initial_lr = 1e-3
         self.num_epochs = 150
+
+
+class nnUNetTrainer1e3_200e_DA5ord0(nnUNetTrainerDualVal_DA5ord0):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+
+        self.initial_lr = 1e-3
+        self.num_epochs = 200
 
 
 class nnUNetTrainer1e3_150e_DA5Segord0(nnUNetTrainerDualVal_DA5Segord0):
