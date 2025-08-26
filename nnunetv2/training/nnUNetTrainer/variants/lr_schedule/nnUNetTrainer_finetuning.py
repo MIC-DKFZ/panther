@@ -296,6 +296,13 @@ class nnUNetTrainer1e4_50e_Refiner(nnUNetTrainerDualVal):
         self.initial_lr = 1e-4
         self.num_epochs = 50
 
+class nnUNetTrainer1e5_50e_Refiner(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-5
+        self.num_epochs = 50
+
 
 class nnUNetTrainer1e3(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
