@@ -289,12 +289,19 @@ class nnUNetTrainerDualVal_DA5Segord0(nnUNetTrainerDA5Segord0):
         self.print_to_log_file("Training and all custom validations are finished.")
 
 
+class nnUNetTrainer1e4_50e_Refiner(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-4
+        self.num_epochs = 50
+
+
 class nnUNetTrainer1e3(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
         super().__init__(plans, configuration, fold, dataset_json, device)
         self.initial_lr = 1e-3
-
 
 class nnUNetTrainer1e3_150e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
@@ -303,6 +310,12 @@ class nnUNetTrainer1e3_150e(nnUNetTrainerDualVal):
         self.initial_lr = 1e-3
         self.num_epochs = 150
 
+class nnUNetTrainer1e3_100e(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 100
 
 class nnUNetTrainer1e3_200e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
@@ -311,13 +324,19 @@ class nnUNetTrainer1e3_200e(nnUNetTrainerDualVal):
         self.initial_lr = 1e-3
         self.num_epochs = 200
 
-
 class nnUNetTrainer1e3_250e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
         super().__init__(plans, configuration, fold, dataset_json, device)
         self.initial_lr = 1e-3
         self.num_epochs = 250
+
+class nnUNetTrainer1e3_300e(nnUNetTrainerDualVal):
+    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
+                 device: torch.device = torch.device('cuda')):
+        super().__init__(plans, configuration, fold, dataset_json, device)
+        self.initial_lr = 1e-3
+        self.num_epochs = 300
 
 
 class nnUNetTrainer1e4_150e(nnUNetTrainerDualVal):
@@ -327,7 +346,6 @@ class nnUNetTrainer1e4_150e(nnUNetTrainerDualVal):
         self.initial_lr = 1e-4
         self.num_epochs = 150
 
-
 class nnUNetTrainer2e3_150e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
@@ -335,29 +353,12 @@ class nnUNetTrainer2e3_150e(nnUNetTrainerDualVal):
         self.initial_lr = 2e-3
         self.num_epochs = 150
 
-
 class nnUNetTrainer3e3_150e(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
         super().__init__(plans, configuration, fold, dataset_json, device)
         self.initial_lr = 3e-3
         self.num_epochs = 150
-
-
-class nnUNetTrainer1e3_100e(nnUNetTrainerDualVal):
-    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
-                 device: torch.device = torch.device('cuda')):
-        super().__init__(plans, configuration, fold, dataset_json, device)
-        self.initial_lr = 1e-3
-        self.num_epochs = 100
-
-
-class nnUNetTrainer1e3_300e(nnUNetTrainerDualVal):
-    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
-                 device: torch.device = torch.device('cuda')):
-        super().__init__(plans, configuration, fold, dataset_json, device)
-        self.initial_lr = 1e-3
-        self.num_epochs = 300
 
 
 class nnUNetTrainer1e3_150e_polylrlin(nnUNetTrainerDualVal):
@@ -375,7 +376,6 @@ class nnUNetTrainer1e3_150e_polylrlin(nnUNetTrainerDualVal):
         self.lr_scheduler = PolyLRScheduler_lin_warmup(self.optimizer, self.initial_lr, warmup_steps=50, max_steps=self.num_epochs)    
         return self.optimizer, self.lr_scheduler
     
-
 class nnUNetTrainer1e3_300e_polylrlin(nnUNetTrainerDualVal):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
                  device: torch.device = torch.device('cuda')):
