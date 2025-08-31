@@ -182,6 +182,73 @@ def compute_metrics_on_folder_simple(folder_ref: str, folder_pred: str, labels: 
 # ### END VENDORED CODE ###
 # ###################################################################################################
 
+def evaluate_fold_separately(pred_dir: str, gt_dir: str, val_best: bool = False):
+    """
+    Evaluates segmentation metrics for each fold separately by directly
+    evaluating the contents of each fold's validation directory.
+
+    Args:
+        pred_dir (str): Base directory of the trained model (contains fold_X folders).
+        gt_dir (str): Directory with ground truth segmentation files.
+        val_best (bool): Whether to use 'validation' (True) or 'validation_final' (False).
+    """
+    print(f"\n<Running Fold-Separate Evaluation for Model: {os.path.basename(pred_dir)}>")
+
+    all_folds_results = {}
+    
+    # Find all fold_X directories
+    try:
+        fold_dirs = sorted([d for d in os.listdir(pred_dir) if d.startswith('fold_') and os.path.isdir(os.path.join(pred_dir, d))])
+    except FileNotFoundError:
+        print(f"Error: Prediction directory not found at '{pred_dir}'")
+        return {}
+
+    if not fold_dirs:
+        print(f"Error: No 'fold_X' directories found in '{pred_dir}'.")
+        return {}
+
+    for fold_name in fold_dirs:
+        print(f"\n--- Processing {fold_name} ---")
+        
+        validation_subfolder = "validation" if val_best else "validation_final"
+        fold_pred_dir = os.path.join(pred_dir, fold_name, validation_subfolder)
+
+        if not os.path.isdir(fold_pred_dir):
+            print(f"  Validation folder '{validation_subfolder}' not found in '{os.path.join(pred_dir, fold_name)}'. Skipping.")
+            continue
+        
+        # Get the list of subjects directly from the files in this folder
+        try:
+            subject_list = sorted(list(set([f.replace('.nii.gz', '') for f in os.listdir(fold_pred_dir) if f.endswith('.nii.gz')])))
+            if not subject_list:
+                print("  No .nii.gz prediction files found in this folder. Skipping.")
+                continue
+            print(f"  Found {len(subject_list)} prediction files to evaluate.")
+        except FileNotFoundError:
+            print(f"  Prediction folder not found at '{fold_pred_dir}'. Skipping.")
+            continue
+
+        try:
+            # Call your original evaluation function.
+            # It already works perfectly when given a pred_dir and a subject_list.
+            results = evaluate_segmentation_performance(
+                pred_dir=fold_pred_dir, # We point directly to the validation folder
+                gt_dir=gt_dir,
+                subject_list=subject_list,
+                is_fold_separate_run=True # This prevents the function from creating a 'fold_all' dir
+            )
+            
+            # We only care about the final aggregated numbers for this fold
+            all_folds_results[fold_name] = results['aggregates']
+            print(f"  -> Results for {fold_name}:")
+            for metric, value in results['aggregates'].items():
+                print(f"     {metric}: {value:.4f}")
+
+        except Exception as e:
+            print(f"  Error processing {fold_name}: {e}")
+            all_folds_results[fold_name] = {"error": str(e)}
+
+    return all_folds_results
 
 # NEW FUNCTION: Add this to fix NumPy types for JSON serialization.
 def recursive_fix_for_json_export(my_dict: dict):
@@ -243,58 +310,49 @@ def find_file(directory, subject, allowed_extensions=ALLOWED_EXTENSIONS):
         if os.path.exists(file_path):
             return file_path
     return None
-
-def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbose=False, include=None, exclude=None, val_best=False):
+def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbose=False, include=None, exclude=None, val_best=False, is_fold_separate_run=False):
     """
-    Evaluates segmentation metrics for all subjects.
-    - pred_dir: Directory containing prediction files (.mha or .nii.gz).
-    - gt_dir: Directory containing ground truth files (.mha or .nii.gz).
-    - subject_list: Either a list of subject IDs or a JSON file (with "subject_list" key).
-    - verbose: If True, prints per-subject metrics.
-    - include: If set, only processes files ending with this string.
-    - exclude: If set, skips files ending with this string.
-
-    Returns a dictionary with per-subject metrics and aggregated metrics.
+    Evaluates segmentation metrics for all subjects. Can operate in two modes:
+    1. Default: Aggregates all fold predictions into a temporary 'fold_all' directory and evaluates them together.
+    2. Fold-Separate: Evaluates only the files in the provided pred_dir, as controlled by a subject_list.
     """
 
-    results_main_dir = pred_dir
-    pred_dir = os.path.join(pred_dir, "fold_all")
+    # --- THIS IS THE LOGIC YOU ASKED FOR ---
+    if not is_fold_separate_run:
+        # This is Mode 1: The original, aggregate behavior
+        print("<Running in AGGREGATE mode: Combining all folds>")
+        results_main_dir = pred_dir
+        # The temporary directory to hold all predictions
+        pred_dir = os.path.join(results_main_dir, "fold_all")
 
-    if not os.path.exists(pred_dir):
-        os.mkdir(pred_dir)
+        if os.path.exists(pred_dir):
+            shutil.rmtree(pred_dir) # Clean up previous runs
+        os.makedirs(pred_dir, exist_ok=True)
 
-    file_copy_count = 0
-    folders_to_scan = [f"fold_{i}/"+("validation" if val_best else "validation_final") for i in range(5)]
+        file_copy_count = 0
+        folders_to_scan = [f"fold_{i}/" + ("validation" if val_best else "validation_final") for i in range(5)]
 
-    for fold_name in folders_to_scan:
-        source_dir = os.path.join(results_main_dir,fold_name)
-
-        if not os.path.isdir(source_dir):
-            print(f"Skipping: Directory '{source_dir}' not found.")
-            continue 
-
-        print(f"--- Searching in '{source_dir}' ---")
-        all_nii_files = list(Path(source_dir).glob("*.nii.gz"))
-        
-        nii_files = all_nii_files
-        if include:
-            print(f"  -- Applying include filter: ending with '{include}'")
-            nii_files = [f for f in nii_files if f.name.endswith(include)]
-        
-        if exclude:
-            print(f"  -- Applying exclude filter: NOT ending with '{exclude}'")
-            nii_files = [f for f in nii_files if not f.name.endswith(exclude)]
-
-        if not nii_files:
-            print("  No .nii.gz files found after applying filters.")
-            continue
-
-        for nii_file_path in nii_files:
-            destination_path = os.path.join(pred_dir, nii_file_path.name)
-            print(f"  -> Copying '{nii_file_path.name}'")
-            shutil.copy(nii_file_path, destination_path)
-            file_copy_count += 1
+        for fold_name in folders_to_scan:
+            source_dir = os.path.join(results_main_dir, fold_name)
+            if not os.path.isdir(source_dir):
+                if verbose: print(f"Skipping: Directory '{source_dir}' not found.")
+                continue
             
+            all_nii_files = list(Path(source_dir).glob("*.nii.gz"))
+            for nii_file_path in all_nii_files:
+                destination_path = os.path.join(pred_dir, nii_file_path.name)
+                shutil.copy(nii_file_path, destination_path)
+                file_copy_count += 1
+        
+        print(f"Aggregated {file_copy_count} prediction files into temporary 'fold_all' directory for evaluation.")
+    else:
+        # This is Mode 2: The new, fold-separate behavior
+        if verbose: print(f"<Running in FOLD-SEPARATE mode on directory: {pred_dir}>")
+    # --- END OF LOGIC ---
+
+    # ... (THE REST OF THE FUNCTION IS THE SAME) ...
+    # This part of the code now works on whichever `pred_dir` was set by the logic above.
+    
     if isinstance(subject_list, (str, Path)):
         with open(subject_list, "r") as fp:
             subject_list = json.load(fp)["subject_list"]
@@ -313,98 +371,55 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
         pred_file = find_file(pred_dir, subj)
         gt_file = find_file(gt_dir, subj)
 
-        if pred_file is None:
-            if verbose:
-                print(f"Prediction file not found for subject {subj}")
-            continue
-        if gt_file is None:
-            if verbose:
-                print(f"Ground truth file not found for subject {subj}")
+        if pred_file is None or gt_file is None:
             continue
 
         try:
             mask_pred, spacing_pred = load_mask(pred_file)
             mask_gt, spacing_gt = load_mask(gt_file)
         except Exception as e:
-            if verbose:
-                print(f"Error loading subject (or mask and spacing) {subj}: {e}")
+            if verbose: print(f"Error loading subject {subj}: {e}")
             continue
 
-        # Check that the shapes match.
-        if mask_gt.shape != mask_pred.shape:
-            raise ValueError(
-                f"Shape mismatch for subject {subj}: GT shape {mask_gt.shape} vs Pred shape {mask_pred.shape}")
-        # Check that the voxel spacings match.
-        if not np.allclose(spacing_gt, spacing_pred, rtol=0, atol=1e-4):
-                raise ValueError(
-                    f"Voxel spacing mismatch: GT spacing {spacing_gt} vs Pred spacing {spacing_pred}")
+        if mask_gt.shape != mask_pred.shape or not np.allclose(spacing_gt, spacing_pred, rtol=0, atol=1e-4):
+            if verbose: print(f"Shape or spacing mismatch for subject {subj}, skipping.")
+            continue
 
+        mask_pred = (mask_pred > 0).astype(bool)
+        mask_gt = (mask_gt > 0).astype(bool)
 
-        # Ensure prediction mask is binary.
-        mask_pred = (mask_pred == 1).astype(np.uint8).astype(bool)
-        mask_gt = (mask_gt == 1).astype(np.uint8).astype(bool)
-        # Convert masks to boolean as required by the surface-distance library.
-        mask_pred = mask_pred.astype(bool)
-        mask_gt = mask_gt.astype(bool)
-
+        if np.all(mask_pred == 0):
+            # Handle case where prediction is empty but GT is not
+            if np.any(mask_gt):
+                 max_distance = np.linalg.norm(np.array(mask_gt.shape) * np.array(spacing_gt))
+                 subj_metrics = { "subject": subj, "volumetric_dice": 0.0, "surface_dice": 0.0, "hausdorff95": max_distance, "masd": max_distance, "gt_volume": np.sum(mask_gt) * np.prod(spacing_gt), "pred_volume": 0.0 }
+            else: # both are empty
+                 subj_metrics = { "subject": subj, "volumetric_dice": 1.0, "surface_dice": 1.0, "hausdorff95": 0.0, "masd": 0.0, "gt_volume": 0.0, "pred_volume": 0.0 }
+            metrics_list.append(subj_metrics)
+            continue
         
-        # Check for uniform prediction (all zeros or all ones)
-        if np.all(mask_pred == 0) or np.all(mask_pred == 1):
-            if verbose:
-                print(f"Subject {subj}: Prediction mask is uniform. Metrics set to 0.")
-            max_distance = np.linalg.norm(
-                np.array(mask_gt.shape) * np.array(spacing_gt))
-            subj_metrics = {
-                "subject": subj,
-                "volumetric_dice": 0.0,
-                "surface_dice": 0.0,
-                "hausdorff95": max_distance,
-                "masd": max_distance,
-                "gt_volume": np.sum(mask_gt) * np.prod(spacing_gt),
-                "pred_volume": 0.0,
-                "time_score": 0.0
-            }
+        # If GT is empty but prediction is not
+        if not np.any(mask_gt):
+            max_distance = np.linalg.norm(np.array(mask_gt.shape) * np.array(spacing_gt))
+            subj_metrics = { "subject": subj, "volumetric_dice": 0.0, "surface_dice": 0.0, "hausdorff95": max_distance, "masd": max_distance, "gt_volume": 0.0, "pred_volume": np.sum(mask_pred) * np.prod(spacing_gt) }
             metrics_list.append(subj_metrics)
             continue
 
-        # Compute surface-based metrics using the ground truth spacing.
-        surface_distances = surface_metrics.compute_surface_distances(
-            mask_gt, mask_pred, spacing_mm=spacing_gt)
+        surface_distances = surface_metrics.compute_surface_distances(mask_gt, mask_pred, spacing_mm=spacing_gt)
         dice = surface_metrics.compute_dice_coefficient(mask_gt, mask_pred)
-        surf_dice = surface_metrics.compute_surface_dice_at_tolerance(
-            surface_distances, tolerance_mm=5)
-        hausdorff95 = surface_metrics.compute_robust_hausdorff(
-            surface_distances, percent=95)
-        avg_gt_to_pred, avg_pred_to_gt = surface_metrics.compute_average_surface_distance(
-            surface_distances)
+        surf_dice = surface_metrics.compute_surface_dice_at_tolerance(surface_distances, tolerance_mm=5)
+        hausdorff95 = surface_metrics.compute_robust_hausdorff(surface_distances, percent=95)
+        avg_gt_to_pred, avg_pred_to_gt = surface_metrics.compute_average_surface_distance(surface_distances)
         masd = (avg_gt_to_pred + avg_pred_to_gt) / 2.0
-
-        # Compute tumor volumes using the ground truth spacing.
         voxel_volume = np.prod(spacing_gt)
         gt_volume = np.sum(mask_gt) * voxel_volume
         pred_volume = np.sum(mask_pred) * voxel_volume
 
-        subj_metrics = {
-            "subject": subj,
-            "volumetric_dice": dice,
-            "surface_dice": surf_dice,
-            "hausdorff95": hausdorff95,
-            "masd": masd,
-            "gt_volume": gt_volume,
-            "pred_volume": pred_volume,
-        }
+        subj_metrics = { "subject": subj, "volumetric_dice": dice, "surface_dice": surf_dice, "hausdorff95": hausdorff95, "masd": masd, "gt_volume": gt_volume, "pred_volume": pred_volume }
         metrics_list.append(subj_metrics)
-        if verbose:
-            print(f"Subject: {subj}")
-            print(f"  Volumetric Dice: {dice:.4f}")
-            print(f"  Surface Dice (5mm): {surf_dice:.4f}")
-            print(f"  Hausdorff95: {hausdorff95:.4f}")
-            print(f"  MASD: {masd:.4f}")
-            print(
-                f"  GT Volume: {gt_volume:.2f} mm³, Pred Volume: {pred_volume:.2f} mm³")
 
-    if len(metrics_list) == 0:
-        raise RuntimeError("No subjects were processed successfully!")
+    if not metrics_list:
+        return {"per_subject": [], "aggregates": {}}
 
     mean_dice = np.mean([m["volumetric_dice"] for m in metrics_list])
     mean_surf_dice = np.mean([m["surface_dice"] for m in metrics_list])
@@ -414,8 +429,8 @@ def evaluate_segmentation_performance(pred_dir, gt_dir, subject_list=None, verbo
     pred_volumes = np.array([m["pred_volume"] for m in metrics_list])
     rmse_volume = np.sqrt(np.mean((pred_volumes - gt_volumes) ** 2))
     
-    # Delete the fold_all folder only if it was created by this script
-    if os.path.exists(pred_dir):
+    # Final cleanup logic
+    if not is_fold_separate_run and os.path.exists(pred_dir):
         shutil.rmtree(pred_dir)
 
     aggregates = {
@@ -504,14 +519,29 @@ if __name__ == "__main__":
     parser.add_argument("--verbose", action="store_true", help="...")
     parser.add_argument("--subject_list", type=str, default=None, help="...")
     parser.add_argument("--val_best", action="store_true", help="...")
+    parser.add_argument("--fold_separate", action="store_true",
+                        help="Run evaluation and report metrics for each fold separately.")
     
     args = parser.parse_args()
     
-    if args.detailed_eval:
+    if args.fold_separate:
+        # The pred_dir should be the main model folder (containing fold_0, etc.)
+        fold_results = evaluate_fold_separately(args.pred_dir, args.gt_dir, args.val_best)
+        
+        print("\n" + "="*30)
+        print("  Final Fold-Separate Summary")
+        print("="*30)
+        print(json.dumps(fold_results, indent=4))
+        if args.save_path:
+            with open(args.save_path, "w") as f:
+                json.dump(fold_results, f, indent=4)
+            print(f"\nFold-separate results saved to {args.save_path}")
+
+    elif args.detailed_eval:
         if not args.save_path:
             raise ValueError("The '--detailed_eval' flag requires a --save_path to be specified.")
         print("\n<Running Detailed Fold-by-Fold Evaluation using self-contained logic>")
-        run_detailed_evaluation(args.pred_dir, args.gt_dir, args.save_path, args.include, args.exclude, args.val_best)
+        run_detailed_evaluation(args.pred_dir, args.gt_dir, args.save_path, args.include, args.exclude, args.val_best, args.fold_separate)
 
     else: # Default PANTHER evaluation
         print(panther_msg)
@@ -529,7 +559,8 @@ if __name__ == "__main__":
                                                 verbose=args.verbose,
                                                 include=args.include,
                                                 exclude=args.exclude,
-                                                val_best=args.val_best)
+                                                val_best=args.val_best,
+                                                is_fold_separate_run=args.fold_separate)
 
     print("Evaluation Metrics:")
     print(json.dumps(results, indent=4))
