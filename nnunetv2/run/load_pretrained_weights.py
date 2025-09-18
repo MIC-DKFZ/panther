@@ -24,7 +24,9 @@ def load_pretrained_weights(network, fname, verbose=False):
 
     skip_strings_in_pretrained = [
         '.seg_layers.',
-        'stem'
+        # Skip stem when starting from a pretrained checkpoint, because the first layer of the neural network wont fit 
+        # the defined architecture in 3d fullres configuration
+        'stem' 
     ]
 
     if isinstance(network, DDP):

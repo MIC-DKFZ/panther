@@ -1,24 +1,15 @@
 [project]
-name = "nnunetv2"
-version = "2.6.2"
+name = "panther-dkfz"
+version = "0.1.0"
+description = "A deep learning model for segmenting pancreatic ductal adenocarcinoma lesions for PANTHER Challenge Task 1 and Task 2."
 requires-python = ">=3.10"
-description = "nnU-Net is a framework for out-of-the box image segmentation."
+description = "Panther-DKFZ is an nnunetv2 based method for pancreatic ductal adenocarcinoma segmentation. nnunetv2 is a framework for out-of-the box image segmentation."
 readme = "readme.md"
 license = { file = "LICENSE" }
 authors = [
-    { name = "Fabian Isensee", email = "f.isensee@dkfz-heidelberg.de"},
-    { name = "Helmholtz Imaging Applied Computer Vision Lab" }
-]
-classifiers = [
-    "Development Status :: 5 - Production/Stable",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "Intended Audience :: Healthcare Industry",
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: Apache Software License",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Scientific/Engineering :: Image Recognition",
-    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    { name = "Maximilian Rokuss", email = "maximilian.rokuss@dkfz-heidelberg.de"},
+    { name = "Omer Faruk Durugol" email = "omer.durugol@std.medipol.edu.tr"},
+    { name = "German Cancer Research Center" }
 ]
 keywords = [
     'deep learning',
@@ -26,8 +17,9 @@ keywords = [
     'semantic segmentation',
     'medical image analysis',
     'medical image segmentation',
-    'nnU-Net',
-    'nnunet'
+    'tumor lesion',
+    'pancreatic ductal adenocarcinoma',
+    'pancreatic lesion'
 ]
 dependencies = [
     "torch>=2.1.2",
@@ -55,8 +47,8 @@ dependencies = [
 ]
 
 [project.urls]
-homepage = "https://github.com/MIC-DKFZ/nnUNet"
-repository = "https://github.com/MIC-DKFZ/nnUNet"
+homepage = "https://github.com/MIC-DKFZ/panther"
+repository = "https://github.com/MIC-DKFZ/panther"
 
 [project.scripts]
 nnUNetv2_plan_and_preprocess = "nnunetv2.experiment_planning.plan_and_preprocess_entrypoints:plan_and_preprocess_entry"
@@ -81,7 +73,7 @@ nnUNetv2_evaluate_folder = "nnunetv2.evaluation.evaluate_predictions:evaluate_fo
 nnUNetv2_evaluate_simple = "nnunetv2.evaluation.evaluate_predictions:evaluate_simple_entry_point"
 nnUNetv2_convert_MSD_dataset = "nnunetv2.dataset_conversion.convert_MSD_dataset:entry_point"
 
-[project.optional-dependencies]
+[project.optional-dependencies] 
 dev = [
     "black",
     "ruff",

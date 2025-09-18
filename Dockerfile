@@ -21,4 +21,5 @@ RUN python -m pip install \
 
 COPY --chown=user:user inference.py /opt/app/
 
+# Switch to inference.py for Task1, inferenceTask2.py for Task2
 ENTRYPOINT ["python", "inferenceTask2.py"]

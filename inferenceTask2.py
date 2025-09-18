@@ -10,7 +10,9 @@ from glob import glob
 from nnunetv2.inference.predict_from_raw_data import nnUNetPredictor
 
 '''
+Use below in terminal for starting docker in the interactive environment for debugging purposes
 docker run -it --rm --platform=linux/amd64 --network none --gpus all -v "/home/o644l/projects/panther/_test/input:/input" -v "/home/o644l/projects/panther/_test/output:/output" --entrypoint "" panther-dkfz-task2 /bin/bash
+Use below in terminal for running docker as standard
 docker run -it --rm --platform=linux/amd64 --network none --gpus all -v "/home/o644l/projects/panther/_test/input:/input" -v "/home/o644l/projects/panther/_test/output:/output" panther-dkfz-task2
 '''
 
@@ -59,7 +61,7 @@ def run():
     predictor = nnUNetPredictor(
         tile_step_size=0.5,
         use_gaussian=True,
-        use_mirroring=True, # Changed last
+        use_mirroring=False, # Changed last
         perform_everything_on_device=True,
         device=device,
         verbose=True,
@@ -67,8 +69,8 @@ def run():
         allow_tqdm=True
         )
     predictor.initialize_from_trained_model_folder(RESOURCE_PATH, 
-                                                    use_folds="all", 
-                                                    checkpoint_name='checkpoint_final.pth')
+                                                    use_folds=(0,1,2,3,4), #"all" 
+                                                    checkpoint_name='checkpoint_best.pth')
     # Append None to the normalization schemes for the predictor's configuration manager
     # predictor.allowed_mirroring_axes = (1,2)
 

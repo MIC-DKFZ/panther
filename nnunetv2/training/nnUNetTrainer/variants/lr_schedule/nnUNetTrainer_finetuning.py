@@ -1,6 +1,6 @@
-import torch
 import os
 import sys
+import torch
 import shutil
 
 from os.path import join, isfile, isdir
@@ -40,11 +40,10 @@ class nnUNetTrainerDualVal(nnUNetTrainer):
         validation logic before the dataloaders are shut down.
         """
         self.current_epoch -= 1
-        # PART 1: Save the final checkpoint. This logic is from the base class.
         self.save_checkpoint(join(self.output_folder, "checkpoint_final.pth"))
         self.current_epoch += 1
 
-        # PART 2: Perform the custom dual validation.
+        # Perform the custom dual validation.
         self.print_to_log_file("Starting automated dual-checkpoint validation...")
 
         # A) Evaluate the final checkpoint (the model currently loaded in memory).
@@ -76,11 +75,11 @@ class nnUNetTrainerDualVal(nnUNetTrainer):
         else:
             self.print_to_log_file("'checkpoint_best.pth' not found, skipping validation on best checkpoint.")
 
-        # PART 3: Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
+        # Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
         if self.local_rank == 0 and isfile(join(self.output_folder, "checkpoint_latest.pth")):
             os.remove(join(self.output_folder, "checkpoint_latest.pth"))
 
-        # We need to gracefully shut down the dataloaders. This is critical.
+        # Gracefully shut down the dataloaders.
         old_stdout = sys.stdout
         with open(os.devnull, 'w') as f:
             sys.stdout = f
@@ -105,16 +104,15 @@ class nnUNetTrainerDualVal_DA5(nnUNetTrainerDA5):
         validation logic before the dataloaders are shut down.
         """
         self.current_epoch -= 1
-        # PART 1: Save the final checkpoint. This logic is from the base class.
         self.save_checkpoint(join(self.output_folder, "checkpoint_final.pth"))
         self.current_epoch += 1
 
-        # PART 2: Perform the custom dual validation.
+        # Perform the custom dual validation.
         self.print_to_log_file("Starting automated dual-checkpoint validation...")
 
         # A) Evaluate the final checkpoint (the model currently loaded in memory).
         self.print_to_log_file("Running validation on 'checkpoint_final.pth'...")
-        # perform_actual_validation() correctly handles setting the network to eval mode.
+        # perform_actual_validation() handles setting the network to eval mode.
         self.perform_actual_validation(save_probabilities=False)
 
         # Rename the output folder from 'validation' to 'validation_final'.
@@ -141,11 +139,11 @@ class nnUNetTrainerDualVal_DA5(nnUNetTrainerDA5):
         else:
             self.print_to_log_file("'checkpoint_best.pth' not found, skipping validation on best checkpoint.")
 
-        # PART 3: Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
+        # Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
         if self.local_rank == 0 and isfile(join(self.output_folder, "checkpoint_latest.pth")):
             os.remove(join(self.output_folder, "checkpoint_latest.pth"))
 
-        # We need to gracefully shut down the dataloaders. This is critical.
+        # Gracefully shut down the dataloaders
         old_stdout = sys.stdout
         with open(os.devnull, 'w') as f:
             sys.stdout = f
@@ -170,11 +168,10 @@ class nnUNetTrainerDualVal_DA5ord0(nnUNetTrainerDA5ord0):
         validation logic before the dataloaders are shut down.
         """
         self.current_epoch -= 1
-        # PART 1: Save the final checkpoint. This logic is from the base class.
         self.save_checkpoint(join(self.output_folder, "checkpoint_final.pth"))
         self.current_epoch += 1
 
-        # PART 2: Perform the custom dual validation.
+        # Perform the custom dual validation.
         self.print_to_log_file("Starting automated dual-checkpoint validation...")
 
         # A) Evaluate the final checkpoint (the model currently loaded in memory).
@@ -206,11 +203,11 @@ class nnUNetTrainerDualVal_DA5ord0(nnUNetTrainerDA5ord0):
         else:
             self.print_to_log_file("'checkpoint_best.pth' not found, skipping validation on best checkpoint.")
 
-        # PART 3: Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
+        # Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
         if self.local_rank == 0 and isfile(join(self.output_folder, "checkpoint_latest.pth")):
             os.remove(join(self.output_folder, "checkpoint_latest.pth"))
 
-        # We need to gracefully shut down the dataloaders. This is critical.
+        # Gracefully shut down the dataloaders.
         old_stdout = sys.stdout
         with open(os.devnull, 'w') as f:
             sys.stdout = f
@@ -235,11 +232,10 @@ class nnUNetTrainerDualVal_DA5Segord0(nnUNetTrainerDA5Segord0):
         validation logic before the dataloaders are shut down.
         """
         self.current_epoch -= 1
-        # PART 1: Save the final checkpoint. This logic is from the base class.
         self.save_checkpoint(join(self.output_folder, "checkpoint_final.pth"))
         self.current_epoch += 1
 
-        # PART 2: Perform the custom dual validation.
+        # Perform the custom dual validation.
         self.print_to_log_file("Starting automated dual-checkpoint validation...")
 
         # A) Evaluate the final checkpoint (the model currently loaded in memory).
@@ -271,11 +267,11 @@ class nnUNetTrainerDualVal_DA5Segord0(nnUNetTrainerDA5Segord0):
         else:
             self.print_to_log_file("'checkpoint_best.pth' not found, skipping validation on best checkpoint.")
 
-        # PART 3: Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
+        # Clean up latest checkpoint and shut down dataloaders. This logic is from the base class.
         if self.local_rank == 0 and isfile(join(self.output_folder, "checkpoint_latest.pth")):
             os.remove(join(self.output_folder, "checkpoint_latest.pth"))
 
-        # We need to gracefully shut down the dataloaders. This is critical.
+        # Gracefully shut down the dataloaders.
         old_stdout = sys.stdout
         with open(os.devnull, 'w') as f:
             sys.stdout = f
@@ -287,21 +283,6 @@ class nnUNetTrainerDualVal_DA5Segord0(nnUNetTrainerDA5Segord0):
 
         empty_cache(self.device)
         self.print_to_log_file("Training and all custom validations are finished.")
-
-
-class nnUNetTrainer1e4_50e_Refiner(nnUNetTrainerDualVal):
-    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
-                 device: torch.device = torch.device('cuda')):
-        super().__init__(plans, configuration, fold, dataset_json, device)
-        self.initial_lr = 1e-4
-        self.num_epochs = 50
-
-class nnUNetTrainer1e5_50e_Refiner(nnUNetTrainerDualVal):
-    def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict,
-                 device: torch.device = torch.device('cuda')):
-        super().__init__(plans, configuration, fold, dataset_json, device)
-        self.initial_lr = 1e-5
-        self.num_epochs = 50
 
 
 class nnUNetTrainer1e3(nnUNetTrainerDualVal):

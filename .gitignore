@@ -89,34 +89,34 @@ ENV/
 .ropeproject
 
 *.memmap
-*.png
 *.zip
 *.npz
 *.npy
-*.jpg
-*.jpeg
 .idea
 *.txt
 .idea/*
-*.png
-# *.nii.gz  # nifti files needed for example_data for github actions tests
+*.nii.gz
 *.nii
 *.tif
 *.bmp
+*.png
+*.jpg
+*.jpeg
 *.pkl
 *.xml
 *.pkl
 *.pdf
-*.png
-*.jpg
-*.jpeg
-
 *.model
 *.tar.gz
+
+_model
+_test
+Dockerfile
 nnUNet_raw
 nnUNet_preprocessed
 nnUNet_results
-_model
-_test
+bsub_commands.md
+inference.py
+inferenceTask2.py
 
 !documentation/assets/scribble_example.png
