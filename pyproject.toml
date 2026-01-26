@@ -3,12 +3,11 @@ name = "panther-dkfz"
 version = "0.1.0"
 description = "A deep learning model for segmenting pancreatic ductal adenocarcinoma lesions for PANTHER Challenge Task 1 and Task 2."
 requires-python = ">=3.10"
-description = "Panther-DKFZ is an nnunetv2 based method for pancreatic ductal adenocarcinoma segmentation. nnunetv2 is a framework for out-of-the box image segmentation."
 readme = "readme.md"
-license = { file = "LICENSE" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "Maximilian Rokuss", email = "maximilian.rokuss@dkfz-heidelberg.de"},
-    { name = "Omer Faruk Durugol" email = "omer.durugol@std.medipol.edu.tr"},
+    { name = "Omer Faruk Durugol", email = "omer.durugol@std.medipol.edu.tr"},
     { name = "German Cancer Research Center" }
 ]
 keywords = [
@@ -83,6 +82,9 @@ dev = [
 [build-system]
 requires = ["setuptools>=67.8.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["nnunetv2", "panther_utilities"]
 
 [tool.codespell]
 skip = '.git,*.pdf,*.svg'

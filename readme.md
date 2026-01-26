@@ -34,7 +34,7 @@ We need to set up an environment with PyTorch and clone this repository to acces
 
 #### 1. Create and activate your Conda environment (recommended)
 ```python
-conda create -n panther python=3.9 # A python version >=3.9 is needed
+conda create -n panther python=3.10 # A python version >=3.10 is needed
 conda activate panther
 ```
 
