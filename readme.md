@@ -67,9 +67,9 @@ EOF
 (You can change the paths according to your preferred directory structure.)
 For Windows OS, open a command line (cmd) and paste below to set environment variables across all cmd and PowerShell terminals (except current one, so you have to restart your terminal):
 ```python
-setx nnUNet_raw "C:\panther\nnUNet_raw"
-setx nnUNet_preprocessed "C:\panther\nnUNet_preprocessed"
-setx nnUNet_results "C:\panther\nnUNet_results"
+setx nnUNet_raw="C:\panther\nnUNet_raw"
+setx nnUNet_preprocessed="C:\panther\nnUNet_preprocessed"
+setx nnUNet_results="C:\panther\nnUNet_results"
 ```
 
 Method 2: If you don't want to change the shell source, paste the variables below whenever opening up a new terminal:
@@ -81,9 +81,9 @@ export nnUNet_results="/panther/nnUNet_results"
 (You can change the paths according to your preferred directory structure.)
 For Windows OS, open a command line (cmd) and paste below to set environment variables for the current command line (if you close the terminal, you need to set up the environment variables again):
 ```python
-set nnUNet_raw "C:\panther\nnUNet_raw"
-set nnUNet_preprocessed "C:\panther\nnUNet_preprocessed"
-set nnUNet_results "C:\panther\nnUNet_results"
+set nnUNet_raw="C:\panther\nnUNet_raw"
+set nnUNet_preprocessed="C:\panther\nnUNet_preprocessed"
+set nnUNet_results="C:\panther\nnUNet_results"
 ```
 
 ### Run Inference for Task 1
